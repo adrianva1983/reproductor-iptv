@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Reproductor IPTV (Cordova) para listas M3U aportadas por el usuario",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test test/m3u.test.js",
     "copy:hls": "node -e \"require('fs').copyFileSync('node_modules/hls.js/dist/hls.min.js','www/js/vendor/hls.min.js')\""
   },
   "keywords": [
