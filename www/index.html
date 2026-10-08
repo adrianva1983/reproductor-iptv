@@ -1,50 +1,85 @@
 <!DOCTYPE html>
-<!--
-    Licensed to the Apache Software Foundation (ASF) under one
-    or more contributor license agreements.  See the NOTICE file
-    distributed with this work for additional information
-    regarding copyright ownership.  The ASF licenses this file
-    to you under the Apache License, Version 2.0 (the
-    "License"); you may not use this file except in compliance
-    with the License.  You may obtain a copy of the License at
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: gap:; script-src 'self'; style-src 'self'; img-src * data: blob:; media-src * data: blob:; connect-src *; worker-src blob:">
+    <title>Reproductor IPTV</title>
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
 
-    http://www.apache.org/licenses/LICENSE-2.0
+<section id="view-library" class="view">
+    <header class="topbar">
+        <h1>Canales</h1>
+        <button id="btn-add-list" type="button">+ Lista</button>
+    </header>
 
-    Unless required by applicable law or agreed to in writing,
-    software distributed under the License is distributed on an
-    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-     KIND, either express or implied.  See the License for the
-    specific language governing permissions and limitations
-    under the License.
--->
-<html>
-    <head>
-        <meta charset="utf-8">
-        <!--
-        Customize this policy to fit your own app's needs. For more guidance, please refer to the docs:
-            https://cordova.apache.org/docs/en/latest/
-        Some notes:
-            * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
-            * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
-                * Enable inline JS: add 'unsafe-inline' to default-src
-        -->
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;">
-        <meta name="format-detection" content="telephone=no">
-        <meta name="msapplication-tap-highlight" content="no">
-        <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
-        <meta name="color-scheme" content="light dark">
-        <link rel="stylesheet" href="css/index.css">
-        <title>Hello World</title>
-    </head>
-    <body>
-        <div class="app">
-            <h1>Apache Cordova</h1>
-            <div id="deviceready" class="blink">
-                <p class="event listening">Connecting to Device</p>
-                <p class="event received">Device is Ready</p>
-            </div>
+    <button id="btn-resume" type="button" class="resume" hidden></button>
+
+    <div class="toolbar">
+        <select id="playlist-select" aria-label="Lista activa"></select>
+        <input id="search" type="search" placeholder="Buscar canal" aria-label="Buscar canal" autocomplete="off">
+    </div>
+
+    <p id="library-status" class="status" role="status"></p>
+    <div id="channel-list"></div>
+
+    <footer class="list-actions">
+        <button id="btn-refresh-list" type="button" hidden>Actualizar lista</button>
+        <button id="btn-delete-list" type="button" class="danger" hidden>Eliminar lista</button>
+    </footer>
+</section>
+
+<section id="view-add" class="view" hidden>
+    <header class="topbar">
+        <button id="btn-add-cancel" type="button">Cancelar</button>
+        <h1>Nueva lista</h1>
+        <span></span>
+    </header>
+    <form id="form-add" class="form">
+        <label>Nombre
+            <input id="add-name" type="text" required maxlength="60" autocomplete="off">
+        </label>
+        <fieldset>
+            <legend>Origen</legend>
+            <label class="inline"><input type="radio" name="source" value="url" checked> URL</label>
+            <label class="inline"><input type="radio" name="source" value="text"> Pegar texto</label>
+        </fieldset>
+        <label id="field-url">URL de la lista
+            <input id="add-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…">
+        </label>
+        <label id="field-text" hidden>Contenido M3U
+            <textarea id="add-text" rows="10" spellcheck="false" autocomplete="off"></textarea>
+        </label>
+        <p id="add-error" class="error" role="alert"></p>
+        <button id="btn-add-save" type="submit" class="primary">Guardar</button>
+    </form>
+</section>
+
+<section id="view-player" class="view player" hidden>
+    <video id="video" playsinline controls preload="auto"></video>
+
+    <div id="player-overlay" class="overlay" hidden>
+        <p id="player-message" role="alert"></p>
+        <div class="overlay-actions">
+            <button id="btn-retry" type="button" class="primary">Reintentar</button>
+            <button id="btn-close-error" type="button">Volver</button>
         </div>
-        <script src="cordova.js"></script>
-        <script src="js/index.js"></script>
-    </body>
+    </div>
+
+    <div class="player-bar">
+        <button id="btn-back" type="button">← Volver</button>
+        <span id="player-title"></span>
+        <button id="btn-fav-player" type="button" aria-pressed="false" aria-label="Favorito">☆</button>
+        <button id="btn-fullscreen" type="button" aria-label="Pantalla completa">⛶</button>
+    </div>
+</section>
+
+<script src="js/vendor/hls.min.js"></script>
+<script src="js/m3u.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/player.js"></script>
+<script src="js/index.js"></script>
+</body>
 </html>
