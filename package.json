@@ -1,0 +1,33 @@
+{
+  "name": "com.adrianva1983.reproductoriptv",
+  "displayName": "ReproductorIPTV",
+  "version": "1.0.0",
+  "description": "Reproductor IPTV (Cordova) para listas M3U aportadas por el usuario",
+  "scripts": {
+    "test": "node --test test/",
+    "copy:hls": "node -e \"require('fs').copyFileSync('node_modules/hls.js/dist/hls.min.js','www/js/vendor/hls.min.js')\""
+  },
+  "keywords": [
+    "ecosystem:cordova"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "cordova-android": "15.1.0",
+    "cordova-ios": "8.1.1",
+    "cordova-plugin-screen-orientation": "3.0.4",
+    "cordova-plugin-statusbar": "4.0.0",
+    "es6-promise-plugin": "4.2.2",
+    "hls.js": "1.7.3"
+  },
+  "cordova": {
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "plugins": {
+      "cordova-plugin-statusbar": {},
+      "cordova-plugin-screen-orientation": {}
+    }
+  },
+  "private": "true"
+}

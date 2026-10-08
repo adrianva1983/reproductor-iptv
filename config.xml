@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.adrianva1983.reproductoriptv" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>ReproductorIPTV</name>
+    <description>Reproductor de canales IPTV a partir de listas M3U aportadas por el usuario.</description>
+    <author href="https://github.com/adrianva1983/reproductor-iptv">Adrian</author>
+    <content src="index.html" />
+
+    <!-- Navegación y apertura de recursos externos (listas y streams).
+         Los dominios no se conocen de antemano, por eso se permite cualquier http/https. -->
+    <allow-navigation href="http://*/*" />
+    <allow-navigation href="https://*/*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <preference name="Orientation" value="default" />
+    <preference name="StatusBarOverlaysWebView" value="false" />
+    <preference name="StatusBarBackgroundColor" value="#000000" />
+    <preference name="StatusBarStyle" value="lightcontent" />
+
+    <platform name="android">
+        <!-- Muchas listas IPTV usan http en claro. Android 9+ lo bloquea por defecto. -->
+        <resource-file src="resources/android/network_security_config.xml" target="app/src/main/res/xml/network_security_config.xml" />
+        <edit-config file="app/src/main/AndroidManifest.xml" target="/manifest/application" mode="merge">
+            <application android:networkSecurityConfig="@xml/network_security_config" />
+        </edit-config>
+    </platform>
+
+    <platform name="ios">
+        <!-- Permite cargas no seguras (http) en WKWebView, en reproducción multimedia y en contenido web. -->
+        <config-file target="*-Info.plist" parent="NSAppTransportSecurity" mode="merge">
+            <dict>
+                <key>NSAllowsArbitraryLoads</key>
+                <true/>
+                <key>NSAllowsArbitraryLoadsInMediaPlayback</key>
+                <true/>
+                <key>NSAllowsArbitraryLoadsInWebContent</key>
+                <true/>
+            </dict>
+        </config-file>
+    </platform>
+</widget>
