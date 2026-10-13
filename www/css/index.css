@@ -3,7 +3,9 @@
     --panel: #181a20;
     --text: #f2f3f5;
     --muted: #9aa0ab;
-    --accent: #3d8bfd;
+    --accent-start: #ff3d6e;
+    --accent-end: #ff8a3d;
+    --accent-gradient: linear-gradient(90deg, var(--accent-start), var(--accent-end));
     --danger: #e5484d;
     --fav: #f5c542;
     color-scheme: dark;
@@ -42,7 +44,7 @@ button {
     cursor: pointer;
 }
 
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--accent-start); border-color: var(--accent-start); color: #fff; }
 button.danger { color: var(--danger); }
 
 .view { min-height: 100%; display: flex; flex-direction: column; }
@@ -58,13 +60,20 @@ button.danger { color: var(--danger); }
     background: var(--bg);
     z-index: 2;
 }
-.topbar h1 { font-size: 1.2rem; margin: 0; }
+.topbar h1 {
+    font-size: 1.2rem;
+    margin: 0;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
 
 .resume {
     margin: 0 16px 8px;
     text-align: left;
     background: var(--panel);
-    color: var(--accent);
+    color: var(--accent-start);
     font-weight: 600;
 }
 
@@ -87,15 +96,30 @@ button.danger { color: var(--danger); }
 
 #channel-list { padding: 0 8px 16px; }
 
+.grp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 10px 8px;
+    margin: 16px 0 4px;
+    cursor: pointer;
+    text-align: left;
+}
 .group-title {
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--muted);
-    margin: 16px 8px 4px;
+    margin: 0;
 }
+.chevron { color: var(--muted); transition: transform 0.15s; }
+.grp-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 
 .channels { list-style: none; margin: 0; padding: 0; }
+.channels[hidden] { display: none; }
 
 .channel {
     display: flex;
@@ -104,6 +128,10 @@ button.danger { color: var(--danger); }
     border-radius: 10px;
 }
 .channel:hover { background: var(--panel); }
+.channel.is-favorite {
+    border-left: 3px solid var(--accent-start);
+    background: linear-gradient(90deg, #ff3d6e22, transparent);
+}
 
 .channel-main {
     flex: 1;
@@ -217,3 +245,16 @@ button.danger { color: var(--danger); }
     text-align: center;
 }
 .overlay-actions { display: flex; gap: 12px; }
+
+#tv-menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+}
+#tv-menu-list li button { width: 100%; }
+#tv-menu-empty, #tv-menu-searching { color: #fffa; }

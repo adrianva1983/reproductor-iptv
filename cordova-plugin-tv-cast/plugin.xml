@@ -1,0 +1,98 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cordova-plugin-tv-cast"
+        version="1.0.0">
+    <name>TvCast</name>
+    <description>
+        Envía el canal en reproducción a un dispositivo Google Cast (Chromecast,
+        Android TV o TV con Google Cast integrado) en la misma red, usando el SDK
+        oficial de Google Cast y su Default Media Receiver público. El selector de
+        dispositivos y el diálogo de conexión los proporciona el propio SDK.
+    </description>
+    <license>Apache-2.0</license>
+
+    <js-module src="www/tv-cast.js" name="TvCast">
+        <clobbers target="cordova.plugins.tvCast" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="TvCast">
+                <param name="android-package" value="com.adrianva1983.reproductoriptv.tvcast.TvCastPlugin" />
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <meta-data
+                android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+                android:value="com.adrianva1983.reproductoriptv.tvcast.CastOptionsProvider" />
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+            <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+            <!-- Fix: Android 13+ (API 33+) exige este permiso para poder escanear
+                 dispositivos WiFi cercanos; sin él, el descubrimiento de Google Cast
+                 se bloquea en silencio (sin error) aunque los permisos de WiFi
+                 anteriores estén concedidos. Confirmado en dispositivo real: appops
+                 lo reportaba como "ignore" y el estado de Cast nunca pasaba de
+                 NO_DEVICES_AVAILABLE pese a haber un Chromecast en la misma red.
+                 neverForLocation: esta app no deriva ubicación física de los
+                 resultados del escaneo, solo busca dispositivos Cast. -->
+            <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+                android:usesPermissionFlags="neverForLocation" />
+        </config-file>
+
+        <framework src="com.google.android.gms:play-services-cast-framework:22.3.1" />
+
+        <source-file
+            src="src/android/com/adrianva1983/reproductoriptv/tvcast/CastOptionsProvider.java"
+            target-dir="src/com/adrianva1983/reproductoriptv/tvcast" />
+        <source-file
+            src="src/android/com/adrianva1983/reproductoriptv/tvcast/TvCastPlugin.java"
+            target-dir="src/com/adrianva1983/reproductoriptv/tvcast" />
+        <source-file
+            src="src/android/com/adrianva1983/reproductoriptv/tvcast/DlnaDevice.java"
+            target-dir="src/com/adrianva1983/reproductoriptv/tvcast" />
+        <source-file
+            src="src/android/com/adrianva1983/reproductoriptv/tvcast/DlnaDiscovery.java"
+            target-dir="src/com/adrianva1983/reproductoriptv/tvcast" />
+        <source-file
+            src="src/android/com/adrianva1983/reproductoriptv/tvcast/DlnaController.java"
+            target-dir="src/com/adrianva1983/reproductoriptv/tvcast" />
+    </platform>
+
+    <!--
+        Soporte iOS preparado pero SIN VERIFICAR: no hay Mac disponible en el entorno
+        donde se escribió este plugin para compilarlo ni probarlo con Xcode/CocoaPods
+        (misma limitación ya señalada para cordova-plugin-ts-proxy).
+    -->
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="TvCast">
+                <param name="ios-package" value="TvCastPlugin" />
+            </feature>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NSBonjourServices">
+            <array>
+                <string>_googlecast._tcp</string>
+            </array>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NSLocalNetworkUsageDescription">
+            <string>Esta app usa la red local para encontrar dispositivos Google Cast (TV, Chromecast) donde enviar el canal.</string>
+        </config-file>
+
+        <source-file src="src/ios/TvCastPlugin.swift" />
+
+        <podspec>
+            <config>
+                <source url="https://cdn.cocoapods.org/" />
+            </config>
+            <pods use-frameworks="true">
+                <pod name="google-cast-sdk" spec="~> 4.8" />
+            </pods>
+        </podspec>
+    </platform>
+</plugin>

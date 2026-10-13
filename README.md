@@ -84,6 +84,12 @@ La firma (certificados, perfiles de aprovisionamiento y equipo de desarrollo) se
 - **Cabeceras y directivas**: no se aplican `#EXTVLCOPT` ni otras cabeceras (User-Agent, Referer) que algunas listas necesitan.
 - **Tamaño**: `localStorage` admite unos 5 MB por origen; las listas muy grandes pueden no guardarse.
 - **Actualizar hls.js**: cambia la versión en `package.json` (con `npm install --save-exact hls.js@<versión>`), ejecuta `npm run copy:hls` y commitea `www/js/vendor/hls.min.js`.
+- **Actualizar mpegts.js**: es un fork local parcheado (ver `mpegts.js-patched/CHANGELOG-fork.md`), no una copia directa de npm. Sigue los pasos de ese changelog para actualizar la versión sin perder el parche de audio en segundo plano.
+- **Reproducción en segundo plano (pantalla bloqueada)**: Android suspende el decodificador de vídeo al bloquear la pantalla (política de ahorro de energía del motor, no evitable con un foreground service). Como vídeo y audio comparten pipeline, el audio se corta con el vídeo salvo que el `MediaSource` no tenga nunca un SourceBuffer de vídeo:
+  - **Canales directos `.ts` (mpegts.js)**: solucionado. Al bloquear la pantalla, la app reconecta el canal en un modo de solo audio (parche propio en `mpegts.js-patched/`) que nunca decodifica vídeo, así que nada se corta. Al volver a la app se reinicia la reproducción normal con vídeo.
+  - **Canales `.m3u8` (hls.js) y HLS nativo (iOS)**: pendiente. Por ahora el audio se sigue cortando al bloquear la pantalla; hls.js no ofrece una forma oficial de descartar el SourceBuffer de vídeo de un stream mezclado, y su `BufferController` es demasiado complejo para parchear con la misma seguridad que mpegts.js sin arriesgar la reproducción normal en primer plano. Ver `docs/superpowers/specs/2026-10-08-background-playback-design.md` para el detalle del diagnóstico.
+  - En MIUI (y otras capas Android agresivas con la gestión de batería) puede hacer falta además desactivar manualmente la optimización de batería para esta app (Ajustes > Apps > Reproductor IPTV > Batería > Sin restricciones) para mayor fiabilidad a largo plazo.
+- **Enviar a TV (Google Cast)**: el botón de Cast (icono junto a favorito/pantalla completa) solo aparece si hay un dispositivo Google Cast disponible en la red **y** el canal activo no es `.ts` (el Default Media Receiver de Google no reproduce MPEG-TS crudo, y los canales `.ts` que pasan por el proxy CORS local no serían alcanzables desde el TV). Usa un plugin nativo propio (`cordova-plugin-tv-cast/`), no una dependencia de npm: el único plugin Cordova de Chromecast disponible lleva más de un año sin publicar y tiene quejas de fiabilidad. Soporte iOS sin verificar (sin Mac disponible, mismo caso que `cordova-plugin-ts-proxy`); tampoco se ha podido validar una sesión de Cast real de extremo a extremo por falta de un Chromecast/Android TV en este entorno. Ver `docs/superpowers/specs/2026-10-09-tv-cast-design.md`.
 
 ## Pruebas
 
@@ -106,5 +112,9 @@ www/js/storage.js                       Listas, favoritos y último canal en loc
 www/js/player.js                        Reproductor (HLS nativo en iOS, hls.js en el resto)
 www/js/index.js                         Lógica de la aplicación
 www/js/vendor/hls.min.js                hls.js 1.7.3 en local
+www/js/vendor/mpegts.min.js             mpegts.js 1.8.2, fork local parcheado (ver mpegts.js-patched/)
+mpegts.js-patched/                      Fork de mpegts.js con el modo de solo audio en segundo plano
+cordova-plugin-background-mode-patched/ Fork del plugin de background-mode (foreground service + MediaSession)
+cordova-plugin-tv-cast/                 Plugin propio: enviar el canal activo a un dispositivo Google Cast
 test/m3u.test.js                        Pruebas del parser
 ```

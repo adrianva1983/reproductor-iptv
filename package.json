@@ -5,7 +5,8 @@
   "description": "Reproductor IPTV (Cordova) para listas M3U aportadas por el usuario",
   "scripts": {
     "test": "node --test test/m3u.test.js",
-    "copy:hls": "node -e \"require('fs').copyFileSync('node_modules/hls.js/dist/hls.min.js','www/js/vendor/hls.min.js')\""
+    "copy:hls": "node -e \"require('fs').copyFileSync('node_modules/hls.js/dist/hls.min.js','www/js/vendor/hls.min.js')\"",
+    "copy:mpegts": "node -e \"require('fs').copyFileSync('mpegts.js-patched/dist/mpegts.js','www/js/vendor/mpegts.min.js')\""
   },
   "keywords": [
     "ecosystem:cordova"
@@ -14,10 +15,15 @@
   "dependencies": {
     "cordova-android": "15.1.0",
     "cordova-ios": "8.1.1",
+    "cordova-plugin-background-mode": "file:cordova-plugin-background-mode-patched",
+    "cordova-plugin-device": "3.0.0",
     "cordova-plugin-screen-orientation": "3.0.4",
     "cordova-plugin-statusbar": "4.0.0",
+    "cordova-plugin-ts-proxy": "file:cordova-plugin-ts-proxy",
+    "cordova-plugin-tv-cast": "file:cordova-plugin-tv-cast",
     "es6-promise-plugin": "4.2.2",
-    "hls.js": "1.7.3"
+    "hls.js": "1.7.3",
+    "mpegts.js": "1.8.2"
   },
   "cordova": {
     "platforms": [
@@ -26,7 +32,10 @@
     ],
     "plugins": {
       "cordova-plugin-statusbar": {},
-      "cordova-plugin-screen-orientation": {}
+      "cordova-plugin-screen-orientation": {},
+      "cordova-plugin-tv-cast": {},
+      "cordova-plugin-background-mode": {},
+      "cordova-plugin-ts-proxy": {}
     }
   },
   "private": "true"

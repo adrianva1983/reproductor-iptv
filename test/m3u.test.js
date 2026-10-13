@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseM3U, isHlsUrl } = require('../www/js/m3u.js');
+const { parseM3U, isHlsUrl, isTsUrl } = require('../www/js/m3u.js');
 
 // Lista ficticia: dominios reservados (.invalid), sin credenciales reales.
 const SAMPLE = [
@@ -76,4 +76,21 @@ test('detección de HLS por extensión, con o sin parámetros', () => {
     assert.equal(isHlsUrl('https://a.example.invalid/x.M3U8?t=1'), true);
     assert.equal(isHlsUrl('https://a.example.invalid/x.ts'), false);
     assert.equal(isHlsUrl('https://a.example.invalid/x.mp4'), false);
+});
+
+test('detección de MPEG-TS por extensión, con o sin parámetros', () => {
+    assert.equal(isTsUrl('https://a.example.invalid/x.ts'), true);
+    assert.equal(isTsUrl('https://a.example.invalid/x.TS?token=1'), true);
+    assert.equal(isTsUrl('https://a.example.invalid/x.m3u8'), false);
+    assert.equal(isTsUrl('https://a.example.invalid/x.mp4'), false);
+});
+
+test('un canal .ts se clasifica con type "ts"', () => {
+    const text = [
+        '#EXTM3U',
+        '#EXTINF:-1,Canal TS',
+        'https://stream.example.invalid/live/user/pass/12345.ts'
+    ].join('\n');
+    const { channels } = parseM3U(text);
+    assert.equal(channels[0].type, 'ts');
 });

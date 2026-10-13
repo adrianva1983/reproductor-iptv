@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cordova-plugin-ts-proxy"
+        version="1.0.0">
+    <name>TsProxy</name>
+    <description>
+        Servidor HTTP local (solo accesible desde el propio dispositivo, 127.0.0.1)
+        que reenvía streams remotos añadiendo cabeceras CORS, para que reproductores
+        basados en MediaSource Extensions (mpegts.js) puedan leerlos dentro del WebView.
+        El WebView aplica CORS a fetch()/XHR pero no al código nativo: este proxy hace
+        la petición real de forma nativa (sin CORS) y se la sirve al WebView como si la
+        respondiera él mismo, con Access-Control-Allow-Origin.
+    </description>
+    <license>Apache-2.0</license>
+
+    <js-module src="www/tsproxy.js" name="TsProxy">
+        <clobbers target="TsProxy" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="TsProxy">
+                <param name="android-package" value="com.adrianva1983.reproductoriptv.tsproxy.TsProxyPlugin" />
+            </feature>
+        </config-file>
+        <source-file src="src/android/com/adrianva1983/reproductoriptv/tsproxy/TsProxyPlugin.java"
+                     target-dir="src/com/adrianva1983/reproductoriptv/tsproxy" />
+    </platform>
+
+    <!--
+        Soporte iOS preparado pero SIN VERIFICAR: no hay Mac disponible en el entorno
+        donde se escribió este plugin para compilarlo ni probarlo con Xcode/CocoaPods.
+        Revisar con calma la primera vez que se compile para iOS.
+    -->
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="TsProxy">
+                <param name="ios-package" value="TsProxyPlugin" />
+            </feature>
+        </config-file>
+        <source-file src="src/ios/TsProxyPlugin.swift" />
+        <framework src="Network.framework" />
+    </platform>
+</plugin>

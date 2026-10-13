@@ -2,6 +2,7 @@
     'use strict';
 
     var HLS_RE = /\.m3u8?(?:$|[?#])/i;
+    var TS_RE = /\.ts(?:$|[?#])/i;
     var HTTP_RE = /^https?:\/\//i;
 
     // La coma que separa atributos del nombre puede aparecer dentro de comillas (group-title="A, B").
@@ -30,6 +31,16 @@
 
     function isHlsUrl(url) {
         return HLS_RE.test(url);
+    }
+
+    function isTsUrl(url) {
+        return TS_RE.test(url);
+    }
+
+    function channelType(url) {
+        if (isHlsUrl(url)) return 'hls';
+        if (isTsUrl(url)) return 'ts';
+        return 'direct';
     }
 
     // Devuelve { channels, skipped }. Solo se aceptan URLs http/https; el resto cuenta como omitido.
@@ -72,14 +83,14 @@
                 logo: HTTP_RE.test(info.logo || '') ? info.logo : '',
                 group: info.group || 'Sin grupo',
                 url: line,
-                type: isHlsUrl(line) ? 'hls' : 'direct'
+                type: channelType(line)
             });
         }
 
         return { channels: channels, skipped: skipped };
     }
 
-    var api = { parseM3U: parseM3U, isHlsUrl: isHlsUrl };
+    var api = { parseM3U: parseM3U, isHlsUrl: isHlsUrl, isTsUrl: isTsUrl };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = api;

@@ -68,15 +68,32 @@
         </div>
     </div>
 
+    <div id="cast-banner" class="overlay" hidden>
+        <p>Reproduciendo en <span id="cast-device-name"></span></p>
+        <div class="overlay-actions">
+            <button id="btn-cast-stop" type="button" class="primary">Dejar de enviar</button>
+        </div>
+    </div>
+
+    <div id="tv-menu" class="overlay" hidden>
+        <ul id="tv-menu-list"></ul>
+        <div class="overlay-actions">
+            <button id="btn-tv-menu-close" type="button">Cancelar</button>
+        </div>
+    </div>
+
     <div class="player-bar">
         <button id="btn-back" type="button">← Volver</button>
         <span id="player-title"></span>
+        <button id="btn-send-tv" type="button" hidden aria-label="Enviar a TV">⇄TV</button>
         <button id="btn-fav-player" type="button" aria-pressed="false" aria-label="Favorito">☆</button>
         <button id="btn-fullscreen" type="button" aria-label="Pantalla completa">⛶</button>
     </div>
 </section>
 
+<script src="cordova.js"></script>
 <script src="js/vendor/hls.min.js"></script>
+<script src="js/vendor/mpegts.min.js"></script>
 <script src="js/m3u.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/player.js"></script>

@@ -1,0 +1,18 @@
+{
+  "name": "cordova-plugin-tv-cast",
+  "version": "1.0.0",
+  "description": "Envía el canal en reproducción a un dispositivo Google Cast (Chromecast/Android TV) en la misma red, usando el SDK oficial de Google Cast.",
+  "cordova": {
+    "id": "cordova-plugin-tv-cast",
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-android",
+    "cordova-ios"
+  ],
+  "license": "Apache-2.0"
+}

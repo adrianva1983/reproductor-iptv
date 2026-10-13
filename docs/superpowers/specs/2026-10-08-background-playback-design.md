@@ -60,3 +60,25 @@ No es testeable con el test runner de Node (`test/m3u.test.js` cubre solo el par
 ## Limitación conocida a documentar en el README
 
 En MIUI (y otras capas Android agresivas con la gestión de batería) puede ser necesario que el usuario desactive manualmente la optimización de batería para esta app (Ajustes > Apps > Reproductor IPTV > Batería > Sin restricciones) para que el *foreground service* sobreviva de forma fiable a largo plazo. Se añade esta nota junto a las demás limitaciones conocidas ya documentadas (CORS, contenido mixto, etc.).
+
+## Addendum (2026-10-09): lo que el plan original no cubría
+
+Validado en dispositivo real (Xiaomi/MIUI) que el plan de arriba (foreground service ligado a `pause`/`resume`) **no era suficiente**. Se encontraron dos problemas adicionales, en este orden:
+
+### 1. MIUI mata el audio aunque el foreground service esté activo
+
+Con el foreground service y el wakelock correctamente activos, el audio seguía cortándose. El log del dispositivo mostró que el subsistema `SmartPower` de MIUI marca el audio como "recurso inactivo" (`R(resource inactive ... audio)`) y lo corta, porque la reproducción no estaba respaldada por una `MediaSession` de Android reconocida.
+
+**Fix**: `cordova-plugin-background-mode-patched/src/android/ForegroundService.java` ahora crea una `MediaSession` (API nativa, sin dependencias nuevas — `minSdkVersion` del proyecto es 24, `MediaSession` existe desde API 21) con `PlaybackState.STATE_PLAYING` mientras el modo está activo, y la enlaza a la notificación vía `Notification.MediaStyle`. Sin controles de reproducción (el alcance sigue siendo solo informativo). Ver `cordova-plugin-background-mode-patched/CHANGELOG.md`.
+
+### 2. El problema real: Android suspende el decodificador de vídeo al bloquear pantalla
+
+Confirmado con logs: al bloquear la pantalla, el `<video>` HTML5 pierde su `MediaCodec` casi de inmediato (`Codec released` / `MediaCodec::~MediaCodec()`), **independientemente** de a qué elemento (`<video>` o `<audio>`) esté enlazado el `MediaSource` — es una política de ahorro de energía de Chromium al detectar la página oculta (`visible->invisible`), no algo ligado a la superficie de render. Como vídeo y audio van por el mismo pipeline de decodificación, el audio se corta con el vídeo. Ni el foreground service ni la `MediaSession` del punto 1 pueden evitar esto: actúan a nivel de proceso/sistema, no a nivel del decodificador de un elemento de medios concreto.
+
+La única forma de que el audio sobreviva es que el `MediaSource` **nunca tenga un SourceBuffer de vídeo**, para que el motor no tenga nada que decodificar ni que suspender.
+
+**Fix aplicado (parcial, solo canales `.ts`)**: fork propio de mpegts.js (`mpegts.js-patched/`, ver su `CHANGELOG-fork.md`) con una opción de configuración `audioOnly` que hace que `appendInitSegment()`/`appendMediaSegment()` descarten los segmentos de tipo `video` sin crear nunca su `SourceBuffer`. En `www/js/player.js`, `enterBackground()`/`exitBackground()` reconectan el canal en este modo sobre un `<audio>` oculto al bloquear pantalla (solo para canales tipo `ts`, servidos por mpegts.js), y reinician la reproducción normal con vídeo al volver a la app.
+
+Validado en dispositivo real: sin el parche, el audio se cortaba de forma consistente a los 5-8 segundos de bloquear la pantalla. Con el parche, se probó con la pantalla bloqueada 30+ segundos sin cortes, y la vuelta a primer plano reinicia el vídeo limpiamente.
+
+**Pendiente, no cubierto**: canales `.m3u8` (hls.js) y HLS nativo en iOS. Se intentó primero una vía más barata — reasignar la misma instancia de hls.js de `<video>` a un `<audio>` oculto sin recrear el stream — pero no funcionó (mismo patrón de corte, confirmado en log), lo cual tiene sentido dado que el punto 2 de arriba ya explica que el problema no depende del elemento. Parchear hls.js de la misma forma que mpegts.js es posible en teoría (mismo principio: nunca crear el SourceBuffer de vídeo), pero su `BufferController` es mucho más complejo que el `MSEController` de mpegts.js (gestiona ABR, múltiples niveles, fragmentos, pistas de audio alternativas) y es la misma instancia que sirve la reproducción normal en primer plano — parchearlo mal podría romper la reproducción normal, no solo el modo en segundo plano. Se decidió no abordarlo en esta iteración.

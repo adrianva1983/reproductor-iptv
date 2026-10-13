@@ -10,8 +10,14 @@
         favorites: [],
         parsed: {},          // caché por id de lista
         current: null,       // canal en reproducción
-        query: ''
+        query: '',
+        castAvailable: false,  // hay algún dispositivo Cast en la red
+        casting: null         // { protocol: 'cast'|'dlna', deviceName, deviceId? } mientras se envía a un TV, si no null
     };
+    // Grupos de la biblioteca abiertos (fuera de `state`: no se persiste entre
+    // sesiones, se reinicia cada vez que se abre la app o se cambia de lista).
+    var openGroups = new Set();
+    var openGroupsInitialized = false;
 
     // ---------- Utilidades ----------
 
@@ -39,6 +45,40 @@
 
     function isFavorite(url) {
         return state.favorites.indexOf(url) !== -1;
+    }
+
+    // El Default Media Receiver de Google Cast no reproduce MPEG-TS crudo, y los
+    // canales .ts que pasan por el proxy CORS local (127.0.0.1) no serían
+    // alcanzables desde el TV de todas formas.
+    function isCastable(channel) {
+        return !!channel && channel.type !== 'ts';
+    }
+
+    function castContentType(channel) {
+        return channel.type === 'hls' ? 'application/x-mpegURL' : 'video/mp4';
+    }
+
+    // A diferencia de Cast, los canales .ts sí se envían por DLNA (muchos TV los
+    // soportan). Pero el servidor de origen de algunas listas rechaza (403)
+    // peticiones sin User-Agent de navegador -confirmado en dispositivo real con
+    // el Samsung del usuario-, y el TV no puede enviarlo por su cuenta. Para esos
+    // canales se pasa por el proxy local (ya usado por mpegts.js), expuesto
+    // temporalmente a la red con un token de un solo uso mientras dura el envío.
+    function dlnaResolveUrl(channel, callback) {
+        if (channel.type !== 'ts' || !window.TsProxy) {
+            callback(channel.url);
+            return;
+        }
+        window.TsProxy.startForLan(function (info) {
+            if (!info || !info.ip || !info.port) {
+                callback(channel.url); // sin IP de red disponible: se intenta directo, por si acaso
+                return;
+            }
+            var base = 'http://' + info.ip + ':' + info.port + '/ts-proxy?token=' + encodeURIComponent(info.token) + '&url=';
+            callback(base + encodeURIComponent(channel.url));
+        }, function () {
+            callback(channel.url);
+        });
     }
 
     function toggleFavorite(url) {
@@ -118,8 +158,9 @@
     }
 
     function channelRow(channel) {
+        var favOn = isFavorite(channel.url);
         var li = document.createElement('li');
-        li.className = 'channel';
+        li.className = 'channel' + (favOn ? ' is-favorite' : '');
 
         var main = document.createElement('button');
         main.type = 'button';
@@ -133,7 +174,6 @@
         main.addEventListener('click', function () { openChannel(channel); });
 
         var fav = document.createElement('button');
-        var favOn = isFavorite(channel.url);
         fav.type = 'button';
         fav.className = 'fav';
         fav.textContent = favOn ? '★' : '☆';
@@ -153,13 +193,38 @@
 
     function section(title, channels) {
         var wrap = document.createDocumentFragment();
-        var h = document.createElement('h2');
-        h.className = 'group-title';
-        h.textContent = title + ' (' + channels.length + ')';
-        wrap.appendChild(h);
+        var isOpen = openGroups.has(title);
+
+        var head = document.createElement('button');
+        head.type = 'button';
+        head.className = 'grp-head';
+        head.setAttribute('aria-expanded', String(isOpen));
+
+        var label = document.createElement('span');
+        label.className = 'group-title';
+        label.textContent = title + ' (' + channels.length + ')';
+
+        var chevron = document.createElement('span');
+        chevron.className = 'chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        chevron.textContent = '▾';
+
+        head.appendChild(label);
+        head.appendChild(chevron);
+
         var ul = document.createElement('ul');
         ul.className = 'channels';
+        ul.hidden = !isOpen;
         channels.forEach(function (ch) { ul.appendChild(channelRow(ch)); });
+
+        head.addEventListener('click', function () {
+            var nowOpen = ul.hidden; // estaba cerrado, se va a abrir
+            ul.hidden = !nowOpen;
+            head.setAttribute('aria-expanded', String(nowOpen));
+            if (nowOpen) openGroups.add(title); else openGroups.delete(title);
+        });
+
+        wrap.appendChild(head);
         wrap.appendChild(ul);
         return wrap;
     }
@@ -189,7 +254,6 @@
         var visible = parsed.channels.filter(function (ch) { return matches(ch, q); });
 
         var favs = visible.filter(function (ch) { return isFavorite(ch.url); });
-        if (favs.length) list.appendChild(section('Favoritos', favs));
 
         var groups = {};
         var order = [];
@@ -201,6 +265,20 @@
             groups[ch.group].push(ch);
         });
         order.sort(function (a, b) { return a.localeCompare(b, 'es'); });
+
+        // Con búsqueda activa, los grupos con coincidencias se abren solos (si
+        // no, habría que abrir cada uno a mano mientras se busca). La primera
+        // vez (sin búsqueda) solo se abre el primer grupo por defecto.
+        if (q) {
+            if (favs.length) openGroups.add('Favoritos');
+            order.forEach(function (g) { openGroups.add(g); });
+        } else if (!openGroupsInitialized) {
+            var firstTitle = favs.length ? 'Favoritos' : order[0];
+            if (firstTitle) openGroups.add(firstTitle);
+            openGroupsInitialized = true;
+        }
+
+        if (favs.length) list.appendChild(section('Favoritos', favs));
         order.forEach(function (g) { list.appendChild(section(g, groups[g])); });
 
         var msg = visible.length
@@ -251,17 +329,43 @@
         btn.setAttribute('aria-pressed', String(on));
     }
 
+    // A diferencia de Cast (que sabe de antemano si hay un dispositivo
+    // disponible), DLNA no tiene escaneo en segundo plano: no podemos saber si
+    // hay un TV DLNA hasta buscar. Por eso el botón se muestra siempre que haya
+    // un canal activo y no se esté ya enviando a uno, independientemente de
+    // castAvailable (que solo decide si la entrada "Chromecast" aparece dentro
+    // del menú).
+    function updateSendTvButton() {
+        $('btn-send-tv').hidden = !(state.current && !state.casting);
+    }
+
     function openChannel(channel) {
         state.current = channel;
         window.IPTVStorage.setLastChannel({ name: channel.name, url: channel.url, logo: channel.logo, group: channel.group, type: channel.type });
 
         $('player-title').textContent = channel.name;
         updatePlayerFav();
+        updateSendTvButton();
         showView('player');
         statusBar('hide');
         lockLandscape();
-        setPlayerLoading('Cargando…');
-        window.IPTVPlayer.play(channel);
+
+        if (state.casting) {
+            // Ya se está enviando a un TV: el nuevo canal se envía allí en vez de
+            // reproducirse localmente (ver cast-banner, que ya está visible).
+            var opts = { title: channel.name, contentType: castContentType(channel) };
+            if (state.casting.protocol === 'dlna') {
+                var deviceId = state.casting.deviceId;
+                dlnaResolveUrl(channel, function (url) {
+                    cordova.plugins.tvCast.loadMediaDlna(deviceId, url, opts);
+                });
+            } else {
+                cordova.plugins.tvCast.loadMedia(channel.url, opts);
+            }
+        } else {
+            setPlayerLoading('Cargando…');
+            window.IPTVPlayer.play(channel);
+        }
     }
 
     function closePlayer() {
@@ -433,6 +537,8 @@
             window.IPTVStorage.setActiveId(state.activeId);
             state.query = '';
             $('search').value = '';
+            openGroups.clear();
+            openGroupsInitialized = false;
             renderLibrary();
         });
 
@@ -458,6 +564,27 @@
             updatePlayerFav();
         });
         $('btn-fullscreen').addEventListener('click', toggleFullscreen);
+        $('btn-send-tv').addEventListener('click', openTvMenu);
+        $('btn-tv-menu-close').addEventListener('click', function () {
+            $('tv-menu').hidden = true;
+        });
+        $('btn-cast-stop').addEventListener('click', function () {
+            if (!state.casting) return;
+            if (state.casting.protocol === 'dlna') {
+                cordova.plugins.tvCast.stopDlna(state.casting.deviceId);
+                if (window.TsProxy) window.TsProxy.stopLan();
+                // DLNA no tiene evento de desconexión: hay que revertir aquí mismo
+                // en vez de esperar a un callback (al contrario que Cast, donde lo
+                // hace onSessionStateChanged('disconnected')).
+                state.casting = null;
+                $('cast-banner').hidden = true;
+                $('video').hidden = false;
+                updateSendTvButton();
+                retryPlayback();
+            } else {
+                cordova.plugins.tvCast.stop();
+            }
+        });
 
         window.IPTVPlayer.init($('video'), {
             onPlaying: hidePlayerOverlay,
@@ -478,6 +605,151 @@
         }, false);
     }
 
+    // Mantiene el audio sonando al bloquear la pantalla: el plugin arranca un
+    // foreground service (con notificación) solo mientras hay un canal activo
+    // y la app está en segundo plano, evitando que Android corte la red/CPU.
+    function bindBackgroundMode() {
+        var bgMode = window.cordova && cordova.plugins && cordova.plugins.backgroundMode;
+        if (!bgMode) return;
+
+        bgMode.setDefaults({
+            title: 'Reproductor IPTV',
+            text: 'Reproduciendo en segundo plano'
+        });
+
+        // Se actualiza el título con el canal actual al evento 'activate'
+        // (y no justo tras bgMode.enable()) porque configure() del propio
+        // plugin solo actúa si ya está marcado como activo en el wrapper JS,
+        // y eso tarda un viaje de ida y vuelta al nativo en confirmarse.
+        bgMode.on('activate', function () {
+            if (state.current) {
+                bgMode.configure({ title: state.current.name });
+            }
+        });
+
+        bgMode.on('mediapause', function () {
+            window.IPTVPlayer.pauseBackgroundAudio();
+        });
+
+        bgMode.on('mediaplay', function () {
+            window.IPTVPlayer.resumeBackgroundAudio();
+        });
+
+        document.addEventListener('pause', function () {
+            if (window.IPTVPlayer.isActive()) {
+                bgMode.enable();
+                window.IPTVPlayer.enterBackground();
+            }
+        }, false);
+
+        document.addEventListener('resume', function () {
+            bgMode.disable();
+            window.IPTVPlayer.exitBackground();
+        }, false);
+    }
+
+    // Botón "Enviar a TV": abre un menú con el Chromecast (si hay uno disponible
+    // y el canal es enviable, ver isCastable) y los TVs DLNA encontrados al
+    // buscar. Mientras se envía a cualquiera de los dos, la reproducción local
+    // se detiene y el canal se envía directamente desde el TV a la URL del
+    // stream (sin pasar por el proxy CORS del móvil).
+    function bindCastEvents() {
+        var tvCast = window.cordova && cordova.plugins && cordova.plugins.tvCast;
+        if (!tvCast) return;
+
+        tvCast.onAvailabilityChanged(function (available) {
+            state.castAvailable = available;
+        });
+
+        tvCast.onSessionStateChanged(function (evt) {
+            if (evt.state === 'connected') {
+                state.casting = { protocol: 'cast', deviceName: evt.deviceName || 'la TV' };
+                window.IPTVPlayer.stop();
+                $('video').hidden = true;
+                $('cast-device-name').textContent = state.casting.deviceName;
+                $('cast-banner').hidden = false;
+                updateSendTvButton();
+                if (state.current) {
+                    tvCast.loadMedia(state.current.url, { title: state.current.name, contentType: castContentType(state.current) });
+                }
+            } else if (evt.state === 'disconnected') {
+                var wasCasting = !!state.casting && state.casting.protocol === 'cast';
+                if (!wasCasting) return;
+                state.casting = null;
+                $('cast-banner').hidden = true;
+                $('video').hidden = false;
+                updateSendTvButton();
+                if (!$('view-player').hidden && state.current) {
+                    retryPlayback();
+                }
+            }
+        });
+
+        tvCast.onDlnaEvent(function (evt) {
+            var list = $('tv-menu-list');
+            if (evt.type === 'found') {
+                var li = document.createElement('li');
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = evt.name;
+                btn.addEventListener('click', function () {
+                    $('tv-menu').hidden = true;
+                    state.casting = { protocol: 'dlna', deviceName: evt.name, deviceId: evt.id };
+                    window.IPTVPlayer.stop();
+                    $('video').hidden = true;
+                    $('cast-device-name').textContent = evt.name;
+                    $('cast-banner').hidden = false;
+                    updateSendTvButton();
+                    if (state.current) {
+                        var opts = { title: state.current.name, contentType: castContentType(state.current) };
+                        dlnaResolveUrl(state.current, function (url) {
+                            tvCast.loadMediaDlna(evt.id, url, opts);
+                        });
+                    }
+                });
+                li.appendChild(btn);
+                list.appendChild(li);
+            } else if (evt.type === 'done') {
+                var placeholder = $('tv-menu-searching');
+                if (placeholder) placeholder.remove();
+                if (!list.children.length) {
+                    var empty = document.createElement('li');
+                    empty.id = 'tv-menu-empty';
+                    empty.textContent = 'No se han encontrado TVs';
+                    list.appendChild(empty);
+                }
+            }
+        });
+    }
+
+    function openTvMenu() {
+        var tvCast = window.cordova && cordova.plugins && cordova.plugins.tvCast;
+        if (!tvCast) return;
+        var list = $('tv-menu-list');
+        list.textContent = '';
+
+        if (state.castAvailable && isCastable(state.current)) {
+            var li = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = 'Chromecast';
+            btn.addEventListener('click', function () {
+                $('tv-menu').hidden = true;
+                tvCast.showCastPicker();
+            });
+            li.appendChild(btn);
+            list.appendChild(li);
+        }
+
+        var searching = document.createElement('li');
+        searching.id = 'tv-menu-searching';
+        searching.textContent = 'Buscando TVs…';
+        list.appendChild(searching);
+
+        $('tv-menu').hidden = false;
+        tvCast.startDlnaDiscovery();
+    }
+
     function start() {
         state.playlists = window.IPTVStorage.getPlaylists();
         state.activeId = window.IPTVStorage.getActiveId();
@@ -486,6 +758,8 @@
 
         bindEvents();
         bindBackButton();
+        bindBackgroundMode();
+        bindCastEvents();
         showView('library');
         renderLibrary();
     }
