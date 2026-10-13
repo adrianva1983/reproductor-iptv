@@ -613,7 +613,7 @@
         if (!bgMode) return;
 
         bgMode.setDefaults({
-            title: 'Reproductor IPTV',
+            title: 'PlayTV',
             text: 'Reproduciendo en segundo plano'
         });
 
