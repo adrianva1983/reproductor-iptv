@@ -329,14 +329,22 @@ public class TsProxyPlugin extends CordovaPlugin {
                 InputStream in = (code >= 200 && code < 400) ? conn.getInputStream() : conn.getErrorStream();
                 byte[] buffer = new byte[8192];
 
+                readLoop:
                 while (in != null) {
+                    int n;
+                    // Fix: un fallo al leer del origen (red, timeout, conexión
+                    // cortada por el origen) merece reintentar reconectando.
+                    // Un fallo al ESCRIBIR al cliente es harina de otro costal:
+                    // significa que el propio reproductor ya cerró su lado de
+                    // la conexión (p.ej. abrió una nueva él mismo), así que
+                    // reconectar al origen y seguir escribiendo contra una
+                    // tubería que ya nadie lee no sirve de nada — solo
+                    // malgastaba los reintentos en milisegundos (confirmado en
+                    // logs reales: los 5 reintentos se consumían en <1s por
+                    // "Broken pipe"). Separar ambos casos deja que este se
+                    // rinda al momento, sin tocar el contador de reintentos.
                     try {
-                        int n;
-                        while ((n = in.read(buffer)) != -1) {
-                            out.write(buffer, 0, n);
-                            retriesLeft = isLiveStream ? 5 : retriesLeft;
-                        }
-                        break;
+                        n = in.read(buffer);
                     } catch (IOException readError) {
                         Log.w(TAG, "Upstream read failed for " + targetUrl + " (" + retriesLeft + " reintentos restantes): " + readError);
                         if (retriesLeft <= 0) throw readError;
@@ -346,7 +354,11 @@ public class TsProxyPlugin extends CordovaPlugin {
                         int retryCode = conn.getResponseCode();
                         in = (retryCode >= 200 && retryCode < 400) ? conn.getInputStream() : conn.getErrorStream();
                         Log.d(TAG, "Reconectado a " + targetUrl + ", nuevo código " + retryCode);
+                        continue readLoop;
                     }
+                    if (n == -1) break;
+                    out.write(buffer, 0, n);
+                    retriesLeft = isLiveStream ? 5 : retriesLeft;
                 }
             }
             out.flush();
